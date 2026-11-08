@@ -1,0 +1,10 @@
+{
+  "name": "Want & Need",
+  "repo": "shopping-list",
+  "purpose": "Every future purchase in one place: needs and wants by category and time frame, with links, photos, a tick-off checklist and totals that feed the budget app; data lives in its own Google Sheet tabs.",
+  "family": "Finance",
+  "stage": "Building",
+  "live": "https://jcm-book-library.github.io/shopping-list/",
+  "tags": [],
+  "updated": "2026-11-07"
+}
