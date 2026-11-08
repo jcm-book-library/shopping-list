@@ -12,7 +12,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const T = '2026-11-07';
 const serial = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 864e5); };
 const SERIAL_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ITEMS = '🛒 Items', SETTINGS = '🛒 Settings';
+const ITEMS = '🛒 Items', SETTINGS = '🛒 Settings', JOBS = '🛒 Stocktakes', STOCK = '🛒 Stock';
 
 let pass = 0, fail = 0;
 function check(name, ok, detail) {
@@ -24,7 +24,21 @@ function check(name, ok, detail) {
 const COLS = ['id', 'item', 'cat', 'sub', 'room', 'kind', 'prio', 'status', 'window', 'cost', 'qty', 'sale', 'final', 'retailer', 'link', 'image', 'stickers', 'pay4', 'notes', 'added', 'bought', 'order', 'source', 'active'];
 const HEADS = {
   [ITEMS]: ['id', 'Item', 'Category', 'Subcategory', 'Room', 'Need or want', 'Priority', 'Status', 'Time frame', 'Price each', 'Qty', 'Sale price each', 'Paid total', 'Retailer', 'Link', 'Image', 'Stickers', 'Pay in 4', 'Notes', 'Date added', 'Date bought', 'Order', 'Source', 'Active'],
-  [SETTINGS]: ['Key', 'Value', 'Notes']
+  [SETTINGS]: ['Key', 'Value', 'Notes'],
+  [JOBS]: ['id', 'Stocktake', 'Category', 'Subcategories', 'Status', 'Started', 'Last checked', 'Notes', 'Active'],
+  [STOCK]: ['id', 'Stocktake id', 'Subcategory', 'Item', 'Qty', 'Condition', 'Detail', 'Where', 'Notes', 'Last checked', 'Shopping id', 'Active']
+};
+const JCOLS = ['id', 'name', 'cat', 'subs', 'status', 'started', 'checked', 'notes', 'active'];
+const SCOLS = ['id', 'job', 'sub', 'item', 'qty', 'cond', 'detail', 'where', 'notes', 'checked', 'shop', 'active'];
+const stockRow = (id, o) => { const d = { id, job: 1, sub: '', item: '', qty: 1, cond: 'Good', detail: '', where: '', notes: '', checked: '', shop: '', active: true, ...o }; return SCOLS.map(c => d[c]); };
+const jobRow = (id, o) => { const d = { id, name: '', cat: 'Clothing', subs: '', status: 'Open', started: serial('2026-10-01'), checked: '', notes: '', active: true, ...o }; return JCOLS.map(c => d[c]); };
+const rowsOf = (db, tab, cols) => db.tabs[tab].slice(1).filter(r => r[0] !== '' && r[0] != null).map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]])));
+const stockOf = (db, id) => rowsOf(db, STOCK, SCOLS).find(r => r.id === id);
+const jobOf = (db, id) => rowsOf(db, JOBS, JCOLS).find(r => r.id === id);
+const stockSeed = () => {
+  const t = seedTabs(true);
+  t[JOBS] = [HEADS[JOBS].slice()]; t[STOCK] = [HEADS[STOCK].slice()];
+  return t;
 };
 const letter = c => String.fromCharCode(65 + COLS.indexOf(c));
 const IMPORT_NAMES = ['Priorities', 'Purchases', 'Clothing', 'Household'];
@@ -35,7 +49,7 @@ function item(id, o) { // a sheet row
 }
 function seedTabs(full) {
   const tabs = {};
-  for (const k of Object.keys(HEADS)) tabs[k] = [HEADS[k].slice()];
+  for (const k of [ITEMS, SETTINGS]) tabs[k] = [HEADS[k].slice()];
   if (!full) return tabs;
   tabs[ITEMS].push(
     item(1, { item: 'Standing desk', cat: 'Office', kind: 'Need', prio: 1, window: 'Black Friday', cost: 1200 }),
@@ -446,12 +460,142 @@ const importTabs = () => ({
     check('import: running it again offers nothing new', (await page.locator('#impList label').count()) === 0 && await page.locator('#impGo').isDisabled());
   });
 
-  /* h. demo, layout */
+  /* h. stocktake: tabs missing -> setup button */
+  await scenario('stock setup', { tabs: { ...seedTabs(true), Other: [['Name'], ['Hello']] } }, async ({ page, db, calls, settle }) => {
+    await live(page); await showBoard(page);
+    check('stock setup: app loads with only Items + Settings (no gate)', await page.locator('#gate').isHidden() && (await page.locator('.card').count()) > 0);
+    const snap = JSON.stringify(db.tabs);
+    await page.click('[data-view=stock]');
+    await page.waitForSelector('[data-act=setup-stock]');
+    check('stock setup: view shows the setup button naming both tabs', (await text(page, '#stock')).includes(JOBS) && (await text(page, '#stock')).includes(STOCK));
+    check('stock setup: no stocktake controls yet', (await page.locator('[data-act=newjob]').count()) === 0);
+    const m = calls.length;
+    await page.click('[data-act=setup-stock]'); await page.waitForSelector('#askDlg[open]');
+    const listed = await page.locator('#askBody li').allInnerTexts();
+    check('stock setup: confirm lists exactly the two stock tabs', JSON.stringify(listed) === JSON.stringify([JOBS, STOCK]), listed);
+    check('stock setup: nothing written before confirming', calls.length === m);
+    await page.click('#askYes'); await live(page); await page.waitForTimeout(200);
+    const added = Object.keys(db.tabs).filter(k => ![ITEMS, SETTINGS, 'Other'].includes(k));
+    check('stock setup: adds exactly the two tabs', added.length === 2 && added.includes(JOBS) && added.includes(STOCK), added);
+    check('stock setup: header rows written', [JOBS, STOCK].every(k => JSON.stringify(db.tabs[k][0]) === JSON.stringify(HEADS[k])), [JOBS, STOCK].map(k => db.tabs[k][0]));
+    const w = writes(calls.slice(m));
+    check('stock setup: only addSheet + header PUTs on the new tabs', w.length === 3 && w.every(c => (c.path === ':batchUpdate' && c.body.requests.length === 2 && c.body.requests.every(q => q.addSheet && /Stocktakes|Stock$/.test(q.addSheet.properties.title))) || (c.method === 'PUT' && /Stock/.test(c.path))), w.map(c => c.method + c.path));
+    check('stock setup: Items, Settings and Other untouched', JSON.stringify({ [ITEMS]: db.tabs[ITEMS], [SETTINGS]: db.tabs[SETTINGS], Other: db.tabs.Other }) === JSON.stringify({ [ITEMS]: JSON.parse(snap)[ITEMS], [SETTINGS]: JSON.parse(snap)[SETTINGS], Other: JSON.parse(snap).Other }));
+    await page.click('[data-view=stock]'); await page.waitForSelector('[data-act=newjob]');
+    check('stock setup: view now offers + New stocktake', (await page.locator('[data-act=setup-stock]').count()) === 0);
+  });
+
+  /* i. stocktake: full flow on seeded stock tabs */
+  await scenario('stocktake', { tabs: stockSeed(), viewport: { width: 1280, height: 1400 } }, async ({ page, db, calls, settle }) => {
+    await live(page); await showBoard(page);
+    await page.click('[data-view=stock]'); await page.waitForSelector('[data-act=newjob]');
+    check('stocktake: empty state, no sheet writes yet', writes(calls).length === 0 && (await text(page, '#stock')).includes('Start a stocktake'));
+    // create via dialog
+    await page.click('[data-act=newjob]'); await page.waitForSelector('#jobDlg[open]');
+    check('stocktake: dialog category defaults to Clothing with preset subcategories', (await page.inputValue('#jCat')) === 'Clothing' && (await page.inputValue('#jSubs')).includes('Socks'), await page.inputValue('#jSubs'));
+    let m = calls.length;
+    await page.fill('#jName', 'My wardrobe'); await page.fill('#jSubs', 'Socks (4), Jackets');
+    await page.click('#jobForm button[type=submit]'); await settle();
+    let w = writes(calls.slice(m));
+    check('stocktake: create = one append PUT to 🛒 Stocktakes', w.length === 1 && w[0].method === 'PUT' && w[0].path.includes(`'${JOBS}'!A`), w.map(c => c.method + c.path));
+    const j = jobOf(db, 1);
+    check('stocktake: job row fields', j && j.name === 'My wardrobe' && j.cat === 'Clothing' && j.subs === 'Socks (4), Jackets' && j.status === 'Open' && j.started === serial(T) && j.active === true, j);
+    await page.waitForSelector('.sbox[data-sub=Socks]');
+    check('stocktake: chip and two subcategory boxes (+ add box)', (await page.locator('[data-job="1"]').count()) === 1 && (await page.locator('.sbox[data-sub]').count()) === 2);
+    check('stocktake: Socks box reads 0 of 4 and offers the gap buy', (await text(page, '.sbox[data-sub=Socks] .cnt')).replace(/\s+/g, ' ').includes('0 of 4') && (await page.locator('[data-gapbuy=Socks]').getAttribute('data-n')) === '4');
+    // add item
+    m = calls.length;
+    const form = page.locator('form[data-addstock=Socks]');
+    await form.locator('input[name=n]').fill('Merino crew'); await form.locator('input[name=q]').fill('6');
+    await form.locator('button[type=submit]').click(); await settle();
+    w = writes(calls.slice(m));
+    check('add item: one append PUT to 🛒 Stock', w.length === 1 && w[0].method === 'PUT' && w[0].path.includes(`'${STOCK}'!A`), w.map(c => c.method + c.path));
+    let r = stockOf(db, 1);
+    check('add item: row fields', r && r.job === 1 && r.sub === 'Socks' && r.item === 'Merino crew' && r.qty === 6 && r.cond === 'Good' && r.checked === serial(T) && r.active === true, r);
+    check('add item: appears in Socks box; box now 6 of 4, buy button gone', (await page.locator('.sbox[data-sub=Socks] .srow').count()) === 1 && (await text(page, '.sbox[data-sub=Socks] .cnt')).includes('6 of 4') && (await page.locator('[data-gapbuy=Socks]').count()) === 0);
+    // qty: two quick bumps -> one debounced write of the final value
+    m = calls.length;
+    await page.click('[data-qty="1"][data-d="1"]'); await page.click('[data-qty="1"][data-d="1"]');
+    await page.waitForTimeout(250);
+    check('qty: nothing written during the debounce window', writes(calls.slice(m)).length === 0);
+    check('qty: display already shows 8', (await text(page, '.srow[data-sid="1"] .step b')) === '8', await text(page, '.srow[data-sid="1"] .step b'));
+    await page.waitForTimeout(900); await settle();
+    w = writes(calls.slice(m));
+    check('qty: exactly one write after the pause', w.length === 1 && w[0].path === '/values:batchUpdate', w.map(c => c.method + c.path));
+    check('qty: final qty 8 stored, Last checked today', stockOf(db, 1).qty === 8 && stockOf(db, 1).checked === serial(T), stockOf(db, 1));
+    // minus clamps at zero in the display only after writes; one decrement round trip
+    m = calls.length;
+    await page.click('[data-qty="1"][data-d="-1"]'); await page.waitForTimeout(1000); await settle();
+    check('qty: decrement writes once, qty 7', writes(calls.slice(m)).length === 1 && stockOf(db, 1).qty === 7, stockOf(db, 1).qty);
+    // condition
+    m = calls.length;
+    await page.click('[data-cond="1"]'); await settle();
+    w = writes(calls.slice(m));
+    check('condition: Good -> Worn, one write', stockOf(db, 1).cond === 'Worn' && w.length === 1, [stockOf(db, 1).cond, w.length]);
+    await page.click('[data-cond="1"]'); await settle();
+    check('condition: Worn -> Replace', stockOf(db, 1).cond === 'Replace');
+    check('condition: Replace pieces leave the usable count (0 of 4, 7 to replace)', (await text(page, '.sbox[data-sub=Socks] .cnt')).replace(/\s+/g, ' ').includes('0 of 4') && (await text(page, '.sbox[data-sub=Socks] .cnt')).includes('7 to replace'), await text(page, '.sbox[data-sub=Socks] .cnt'));
+    await page.click('[data-cond="1"]'); await settle();
+    check('condition: Replace -> Good', stockOf(db, 1).cond === 'Good');
+    // detail edit through the drawer
+    await page.click('.srow[data-sid="1"] .srow-top .c-main');
+    check('drawer: row opens', (await page.locator('.srow[data-sid="1"].open').count()) === 1);
+    m = calls.length;
+    await page.fill('[data-sf=detail][data-sid="1"]', 'Navy, size L'); await page.locator('[data-sf=detail][data-sid="1"]').evaluate(el => el.blur()); await settle();
+    check('detail: saved on change with one write', stockOf(db, 1).detail === 'Navy, size L' && writes(calls.slice(m)).length === 1, stockOf(db, 1));
+    check('detail: other stock fields intact', stockOf(db, 1).item === 'Merino crew' && stockOf(db, 1).qty === 7 && stockOf(db, 1).sub === 'Socks');
+    m = calls.length;
+    await page.locator('[data-sf=detail][data-sid="1"]').evaluate(el => { el.focus(); el.blur(); }); await page.waitForTimeout(150);
+    check('detail: blur without change writes nothing', writes(calls.slice(m)).length === 0);
+    // shift to shopping list
+    const itemsBefore = rowsOf(db, ITEMS, COLS).length;
+    m = calls.length;
+    await page.click('[data-shift="1"]'); await settle();
+    w = writes(calls.slice(m));
+    check('shift: two writes (append to Items, then Shopping id on the stock row)', w.length === 2 && w[0].method === 'PUT' && w[0].path.includes(`'${ITEMS}'!A`) && w[1].path === '/values:batchUpdate', w.map(c => c.method + c.path));
+    const made = rowsOf(db, ITEMS, COLS).find(i => i.item === 'Merino crew');
+    check('shift: one new Items row', rowsOf(db, ITEMS, COLS).length === itemsBefore + 1 && made, itemsBefore);
+    check('shift: Items row category/sub/kind/notes', made && made.cat === 'Clothing' && made.sub === 'Socks' && made.kind === 'Need' && made.status === 'Planned' && made.active === true && made.id === 13 && String(made.notes).includes('From stocktake: My wardrobe') && String(made.notes).includes('Navy, size L'), made);
+    check('shift: stock row got the Shopping id', made && stockOf(db, 1).shop === made.id, stockOf(db, 1).shop);
+    check('shift: drawer now says on the shopping list, button gone', (await page.locator('[data-shift="1"]').count()) === 0 && (await text(page, '.srow[data-sid="1"] .linked')).includes('On the shopping list'));
+    check('shift: Socks box offers a link to shopping list items', (await page.locator('[data-onlist=Socks]').count()) === 1);
+    // Jackets: gap-buy. Jackets has no target, so give one via a second job sub; use Socks by removing the row's pieces
+    m = calls.length;
+    await page.click('[data-delstock="1"]'); await settle();
+    w = writes(calls.slice(m));
+    check('remove: one write, Active FALSE, nothing deleted', w.length === 1 && stockOf(db, 1).active === false && stockOf(db, 1).item === 'Merino crew', stockOf(db, 1));
+    check('remove: row gone from the box', (await page.locator('.srow[data-sid="1"]').count()) === 0);
+    // gap buy: Socks target 4, 0 pieces, 1 open shopping item (qty blank = 1) in clothing/Socks -> 3
+    const btn = page.locator('[data-gapbuy=Socks]');
+    check('gap-buy: count already subtracts the open shopping item (4 - 1 = 3)', (await btn.count()) === 1 && (await btn.getAttribute('data-n')) === '3' && (await btn.innerText()).includes('3'), await btn.count() ? await btn.innerText() : 'missing');
+    m = calls.length;
+    await btn.click(); await settle();
+    w = writes(calls.slice(m));
+    check('gap-buy: one append PUT to 🛒 Items', w.length === 1 && w[0].method === 'PUT' && w[0].path.includes(`'${ITEMS}'!A`), w.map(c => c.method + c.path));
+    const gap = rowsOf(db, ITEMS, COLS).find(i => i.item === 'Socks');
+    check('gap-buy: Items row Item=Socks, Qty=3, Clothing/Socks, note', gap && gap.qty === 3 && gap.cat === 'Clothing' && gap.sub === 'Socks' && gap.kind === 'Need' && String(gap.notes).includes('From stocktake: My wardrobe'), gap);
+    check('gap-buy: button disappears once the gap is covered', (await page.locator('[data-gapbuy=Socks]').count()) === 0);
+    check('gap-buy: shopping link now counts 2', (await text(page, '[data-onlist=Socks]')).startsWith('2'), await text(page, '[data-onlist=Socks]'));
+    // add subcategory
+    m = calls.length;
+    await page.fill('#addSub input[name=n]', 'Hats'); await page.fill('#addSub input[name=q]', '3');
+    await page.click('#addSub button[type=submit]'); await settle();
+    w = writes(calls.slice(m));
+    check('addSub: one write; Subcategories now "Socks (4), Jackets, Hats (3)"', w.length === 1 && jobOf(db, 1).subs === 'Socks (4), Jackets, Hats (3)', jobOf(db, 1).subs);
+    check('addSub: Hats box appears with a 3-piece gap button', (await page.locator('.sbox[data-sub=Hats]').count()) === 1 && (await page.locator('[data-gapbuy=Hats]').getAttribute('data-n')) === '3');
+    m = calls.length;
+    await page.fill('#addSub input[name=n]', 'hats'); await page.click('#addSub button[type=submit]'); await page.waitForTimeout(200);
+    check('addSub: duplicate name (any case) writes nothing', writes(calls.slice(m)).length === 0 && jobOf(db, 1).subs === 'Socks (4), Jackets, Hats (3)');
+    check('stocktake: Items rows untouched apart from the 2 appended (ids 1-12 intact)', [1, 2, 3, 4, 5, 6, 12, 8].every(id => obj(db, id).item));
+    await page.screenshot({ path: path.join(OUT, 'stocktake-1280.png'), fullPage: true });
+  });
+
+  /* j. demo, layout */
   await scenario('demo', { token: false, query: '?demo', viewport: { width: 1280, height: 900 } }, async ({ page, calls }) => {
     await page.waitForSelector('#demoBanner:not([hidden])');
     for (const w of [390, 1280]) {
       await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(120);
-      for (const v of ['board', 'list', 'gallery', 'insights', 'bought']) {
+      for (const v of ['board', 'list', 'gallery', 'insights', 'bought', 'stock']) {
         await page.click(`[data-view=${v}]`); await page.waitForTimeout(150);
         const sw = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
         check(`demo: ${v} has no sideways page scroll at ${w}px`, sw[0] <= sw[1], sw);

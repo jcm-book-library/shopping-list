@@ -249,6 +249,44 @@ dialog form,dialog .dbody{padding:20px;display:flex;flex-direction:column;gap:12
 .ghost{position:fixed;pointer-events:none;z-index:60;opacity:.92;transform:rotate(1.5deg);box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .empty{text-align:center;color:var(--muted);padding:40px 10px}
 
+/* stocktake */
+.jobbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin-bottom:14px}
+.jobhead{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:12px;text-align:center}
+.jobhead .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.sgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.sbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);min-width:0}
+.sbox-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sbox-h .cnt{font-size:13px;color:var(--muted);white-space:nowrap}
+.sbox-h .cnt b{color:var(--fg);font-size:15px}
+.meter{height:6px;background:var(--raise);border-radius:3px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--bar);border-radius:0 3px 3px 0}
+.meter.full i{background:var(--ok)}
+.srows{display:flex;flex-direction:column;gap:6px}
+.srow{border:1px solid var(--line);border-radius:10px;background:var(--bg);transition:border-color .15s}
+.srow:hover,.srow:focus-within,.srow.open{border-color:var(--line2)}
+.srow-top{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:6px 8px}
+.srow .c-name{-webkit-line-clamp:1}
+@media (hover:hover){.srow:hover .c-more{grid-template-rows:1fr}}
+.srow:focus-within .c-more,.srow.open .c-more{grid-template-rows:1fr}
+.srow .more-in{padding:0 8px 8px;border-top:1px solid var(--line)}
+.sfields{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.sfields input,.sfields textarea{font-size:13px;padding:5px 8px;border-radius:8px}
+.sfields .w2{grid-column:1/-1}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.step button{border:0;background:transparent;width:26px;height:26px;border-radius:999px;color:var(--muted);font-size:15px;line-height:1}
+.step button:hover{color:var(--fg);background:var(--raise)}
+.step b{min-width:22px;text-align:center;font-size:13px}
+.cond{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--surface);color:var(--ok);min-width:68px}
+.cond[data-c=Worn]{color:var(--warn)}
+.cond[data-c=Replace]{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line))}
+.sadd{display:grid;grid-template-columns:minmax(0,1fr) 56px auto;gap:6px}
+.sadd input{font-size:13px;padding:6px 9px}
+.sfoot{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;min-height:0}
+.sfoot:empty{display:none}
+.sbox.newsub{border-style:dashed;box-shadow:none;background:transparent;justify-content:center}
+.linked{font-size:12px;color:var(--ok)}
+
+
 @media (max-width:760px){
   .top{grid-template-columns:auto 1fr auto}
   .top .left .status span{display:none}
@@ -267,6 +305,7 @@ dialog form,dialog .dbody{padding:20px;display:flex;flex-direction:column;gap:12
   .brow{grid-template-columns:90px 1fr 78px}
   .fields{grid-template-columns:1fr}
   .board{grid-auto-columns:85%}
+  .sgrid{grid-template-columns:minmax(0,1fr)}
 }
 </style>
 
@@ -296,6 +335,7 @@ dialog form,dialog .dbody{padding:20px;display:flex;flex-direction:column;gap:12
       <button role="tab" data-view="gallery" aria-selected="false">Gallery</button>
       <button role="tab" data-view="insights" aria-selected="false">Budget</button>
       <button role="tab" data-view="bought" aria-selected="false">Bought</button>
+      <button role="tab" data-view="stock" aria-selected="false">Stocktake</button>
     </div></nav>
 
     <div class="tools" id="tools">
@@ -328,6 +368,7 @@ dialog form,dialog .dbody{padding:20px;display:flex;flex-direction:column;gap:12
       <section id="v-gallery" hidden><div class="gallery" id="gallery"></div></section>
       <section id="v-insights" hidden><div class="ins" id="insights"></div></section>
       <section id="v-bought" hidden><div id="bought"></div></section>
+      <section id="v-stock" hidden><div id="stock"></div></section>
     </main>
   </div>
 </div>
@@ -396,6 +437,19 @@ dialog form,dialog .dbody{padding:20px;display:flex;flex-direction:column;gap:12
   </div>
   <p class="msg" id="setMsg" style="color:var(--muted)"></p>
   <div class="dlg-acts"><div><button class="btn btn-ghost" type="button" id="signOut">Sign out</button><a class="btn btn-ghost" id="openSheet" target="_blank" rel="noopener">Open sheet ↗</a></div><div><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">Save</button></div></div>
+</form></dialog>
+
+<dialog id="jobDlg"><form method="dialog" id="jobForm">
+  <h2 id="jTitle">Stocktake</h2>
+  <div class="fields">
+    <div class="field w2"><label for="jName">Name</label><input id="jName" required placeholder="Wardrobe"></div>
+    <div class="field w2"><label for="jCat">Category (from your shopping list)</label><select id="jCat"></select></div>
+    <div class="field w2"><label for="jSubs">Subcategories, comma separated. Add a target in brackets: Socks (10)</label><textarea id="jSubs"></textarea>
+      <div><button class="btn btn-sm" type="button" id="jPreset">Use the starter list for this category</button></div></div>
+    <div class="field w2"><label for="jNotes">Notes</label><input id="jNotes"></div>
+  </div>
+  <p class="msg" id="jMsg"></p>
+  <div class="dlg-acts"><div><button class="btn btn-ghost btn-danger" type="button" id="jRemove">Remove</button></div><div><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">Save</button></div></div>
 </form></dialog>
 
 <div class="toast" id="toast" hidden></div>
@@ -640,6 +694,35 @@ function planImport(src, existing, today) {
   skipped.forEach(m => delete m._tabs);
   return { items: fresh, skipped, merged: dupes };
 }
+/* ---- stocktake ---- */
+const CONDITIONS = ['Good', 'Worn', 'Replace'];
+const SUB_PRESETS = {
+  clothing: 'T-shirts, Shirts, Jumpers, Jackets, Pants, Shorts, Activewear, Socks, Underwear, Sleepwear, Shoes, Hats, Accessories',
+  household: 'Towels, Sheets, Doonas and pillows, Kitchenware, Cleaning, Storage, Tools',
+  tech: 'Cables, Chargers, Batteries, Devices, Accessories',
+  office: 'Stationery, Desk, Cables, Paper',
+  pet: 'Food, Litter, Toys, Grooming',
+  health: 'First aid, Medicine, Toiletries'
+};
+/* "Socks (10), Jackets" → [{ name: 'Socks', target: 10 }, { name: 'Jackets', target: null }] */
+function parseSubs(s) {
+  const out = [];
+  splitList(s).forEach(x => { const m = x.match(/^(.*?)\s*\((\d+)\)\s*$/), name = (m ? m[1] : x).trim();
+    if (name && !out.some(o => o.name.toLowerCase() === name.toLowerCase())) out.push({ name, target: m ? Number(m[2]) : null }); });
+  return out;
+}
+const subsText = list => list.map(x => x.target != null ? `${x.name} (${x.target})` : x.name).join(', ');
+/* Per subcategory: lines, pieces, pieces marked Replace, usable pieces and the gap to the target. */
+function stockSummary(rows, subs) {
+  return subs.map(sb => {
+    const r = rows.filter(x => String(x.sub || '').toLowerCase() === sb.name.toLowerCase());
+    const pieces = r.reduce((t, x) => t + (Number(x.qty) || 0), 0);
+    const replace = r.filter(x => x.cond === 'Replace').reduce((t, x) => t + (Number(x.qty) || 0), 0);
+    const usable = pieces - replace;
+    return { ...sb, lines: r.length, pieces, replace, usable, gap: sb.target != null ? Math.max(0, sb.target - usable) : 0 };
+  });
+}
+const nextCond = c => CONDITIONS[(CONDITIONS.indexOf(c) + 1) % CONDITIONS.length] || 'Good';
 /* LOGIC END */
 
 /* ---------- sheet tabs ---------- */
@@ -649,10 +732,16 @@ const TABS = {
     heads: ['id', 'Item', 'Category', 'Subcategory', 'Room', 'Need or want', 'Priority', 'Status', 'Time frame', 'Price each', 'Qty', 'Sale price each', 'Paid total', 'Retailer', 'Link', 'Image', 'Stickers', 'Pay in 4', 'Notes', 'Date added', 'Date bought', 'Order', 'Source', 'Active'] },
   Settings: { title: '🛒 Settings', key: 'key', cols: ['key', 'value', 'notes'], heads: ['Key', 'Value', 'Notes'] }
 };
+TABS.Jobs = { title: '🛒 Stocktakes', key: 'id', cols: ['id', 'name', 'cat', 'subs', 'status', 'started', 'checked', 'notes', 'active'],
+  heads: ['id', 'Stocktake', 'Category', 'Subcategories', 'Status', 'Started', 'Last checked', 'Notes', 'Active'] };
+TABS.Stock = { title: '🛒 Stock', key: 'id', cols: ['id', 'job', 'sub', 'item', 'qty', 'cond', 'detail', 'where', 'notes', 'checked', 'shop', 'active'],
+  heads: ['id', 'Stocktake id', 'Subcategory', 'Item', 'Qty', 'Condition', 'Detail', 'Where', 'Notes', 'Last checked', 'Shopping id', 'Active'] };
 const TAB_NAMES = Object.keys(TABS);
-const DATE_COLS = new Set(['added', 'bought']);
+const REQUIRED = ['Items', 'Settings'];      // the app needs these; the stocktake tabs are added when first used
+const STOCK_TABS = ['Jobs', 'Stock'];
+const DATE_COLS = new Set(['added', 'bought', 'started', 'checked']);
 const BOOL_COLS = new Set(['pay4', 'active']);
-const NUM_COLS = new Set(['id', 'prio', 'cost', 'qty', 'sale', 'final', 'order']);
+const NUM_COLS = new Set(['id', 'prio', 'cost', 'qty', 'sale', 'final', 'order', 'job', 'shop']);
 const colLetter = i => String.fromCharCode(65 + i);
 const lastCol = tab => colLetter(TABS[tab].cols.length - 1);
 const rng = (tab, a) => `'${TABS[tab].title}'!${a}`;
@@ -665,7 +754,7 @@ const DEFAULT_SETTINGS = [
 ];
 
 const state = { data: {}, sheets: {}, missing: [], view: 'board', groupBy: 'cat', live: false, busy: false, demo: false,
-  q: '', kindF: '', catF: new Set(), showBought: false, sortKeys: ['cat', 'window', 'kind', 'prio'], qaKind: 'Want', open: null };
+  job: null, pend: {}, q: '', kindF: '', catF: new Set(), showBought: false, sortKeys: ['cat', 'window', 'kind', 'prio'], qaKind: 'Want', open: null };
 const D = tab => state.data[tab] || [];
 const emptyData = () => Object.fromEntries(TAB_NAMES.map(n => [n, []]));
 const setting = (k, def) => { const r = D('Settings').find(x => x.key === k); return r && r.value !== '' && r.value != null ? r.value : def; };
@@ -802,11 +891,12 @@ async function readAll() {
   const meta = await g.api('?fields=sheets.properties(sheetId,title,gridProperties.rowCount)');
   const sheets = {}; (meta.sheets || []).forEach(s => { sheets[s.properties.title] = { sid: s.properties.sheetId, rows: s.properties.gridProperties.rowCount }; });
   const missing = TAB_NAMES.filter(n => !sheets[TABS[n].title]);
-  if (missing.length) return { sheets, missing, data: emptyData() };
-  const q = TAB_NAMES.map(n => 'ranges=' + encodeURIComponent(rng(n, `A2:${lastCol(n)}`))).join('&');
+  if (missing.some(n => REQUIRED.includes(n))) return { sheets, missing, data: emptyData() };
+  const have = TAB_NAMES.filter(n => !missing.includes(n));
+  const q = have.map(n => 'ranges=' + encodeURIComponent(rng(n, `A2:${lastCol(n)}`))).join('&');
   const res = await g.api(`/values:batchGet?${q}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`);
-  const data = {};
-  TAB_NAMES.forEach((n, i) => {
+  const data = emptyData();
+  have.forEach((n, i) => {
     const t = TABS[n], vals = (res.valueRanges[i] && res.valueRanges[i].values) || [], rows = [];
     vals.forEach((r, j) => {
       const o = { _row: j + 2 };
@@ -824,7 +914,7 @@ async function refresh(keepNotice) {
   try {
     const r = await readAll();
     state.sheets = r.sheets; state.data = r.data; state.missing = r.missing;
-    if (r.missing.length) { state.live = false; setStatus('error', 'Needs set up'); setGate('setup'); return; }
+    if (r.missing.some(n => REQUIRED.includes(n))) { state.live = false; setStatus('error', 'Needs set up'); setGate('setup'); return; }
     state.live = true; setGate('');
     setStatus('live', 'Live · ' + new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }));
     if (!keepNotice) hideNotice();
@@ -907,8 +997,9 @@ async function saveItem(it, patch, msg) {
   return ok;
 }
 
-async function setupSheet() {
-  const miss = state.missing.slice();
+async function setupSheet(only) {
+  const miss = state.missing.filter(n => (only || REQUIRED).includes(n));
+  if (!miss.length) return;
   const ok = await ask('Set up this sheet?', `<p class="hint" style="margin-bottom:8px">This adds ${plural(miss.length, 'new tab')} to the sheet. Nothing already there is changed.</p><ul>${miss.map(n => `<li>${esc(TABS[n].title)}</li>`).join('')}</ul>`, 'Add tabs');
   if (!ok) return;
   state.busy = true; setStatus('loading', 'Setting up…');
@@ -984,7 +1075,7 @@ function setGate(kind) {
   if (!kind) { el.hidden = true; document.body.removeAttribute('data-gate'); return; }
   document.body.dataset.gate = kind; el.hidden = false;
   if (kind === 'setup') {
-    el.innerHTML = `<h2>Almost there</h2><p class="hint" style="margin-top:8px">This sheet needs ${plural(state.missing.length, 'tab')}: ${state.missing.map(n => esc(TABS[n].title)).join(', ')}. Setting up adds only those, with their header rows. Nothing else in the sheet is touched.</p>
+    el.innerHTML = `<h2>Almost there</h2><p class="hint" style="margin-top:8px">This sheet needs ${plural(state.missing.filter(n => REQUIRED.includes(n)).length, 'tab')}: ${state.missing.filter(n => REQUIRED.includes(n)).map(n => esc(TABS[n].title)).join(', ')}. Setting up adds only those, with their header rows. Nothing else in the sheet is touched.</p>
       <div class="acts"><button class="btn btn-primary" type="button" data-act="setup">Set up sheet</button></div>`;
   } else {
     const c = g.cfg(), ready = c.clientId && c.sheetId;
@@ -1189,8 +1280,8 @@ function renderBought() {
 function renderAll() {
   renderStats(); renderFilters();
   const v = state.view;
-  $('tools').hidden = v === 'insights';
-  if (v === 'board') renderBoard(); else if (v === 'list') renderList(); else if (v === 'gallery') renderGallery(); else if (v === 'insights') renderInsights(); else renderBought();
+  $('tools').hidden = v === 'insights' || v === 'stock'; $('stats').hidden = v === 'stock';
+  if (v === 'board') renderBoard(); else if (v === 'list') renderList(); else if (v === 'gallery') renderGallery(); else if (v === 'insights') renderInsights(); else if (v === 'stock') renderStock(); else renderBought();
   loadDriveThumbs();
 }
 function showView(v) {
@@ -1352,7 +1443,7 @@ document.addEventListener('click', async e => {
   const t = e.target;
   const act = t.closest('[data-act]');
   if (act) { const a = act.dataset.act;
-    if (a === 'setup') setupSheet(); else if (a === 'connect') connect(); else if (a === 'settings') openSettings(); else if (a === 'demo') startDemo();
+    if (a === 'setup') setupSheet(); else if (a === 'setup-stock') setupSheet(STOCK_TABS); else if (a === 'newjob') openJob(null); else if (a === 'editjob') openJob(curJob()); else if (a === 'checkedjob') { const j = curJob(); if (j) saveJob(j, { checked: todayIso() }, 'Marked as checked today'); } else if (a === 'connect') connect(); else if (a === 'settings') openSettings(); else if (a === 'demo') startDemo();
     else if (a === 'copy' || a === 'csv') exportRows(a); return; }
   const flip = t.closest('[data-flip]'); if (flip) { const it = byId(flip.dataset.flip); if (it) saveItem(it, { kind: it.kind === 'Need' ? 'Want' : 'Need' }); return; }
   const sc = t.closest('[data-setcat]'); if (sc) { const it = byId(sc.dataset.setcat); if (it && it.cat !== sc.dataset.v) saveItem(it, { cat: sc.dataset.v }, 'Moved to ' + sc.dataset.v); return; }
@@ -1386,6 +1477,151 @@ $('quickAdd').addEventListener('submit', async e => {
     $('qaItem').value = ''; $('qaPrice').value = '';
     toast(`Added ${o.item}`, fromUrl ? { label: 'Edit name', fn: () => { const it = D('Items').find(x => x.id === o.id); if (it) openItem(it); } } : null);
   }
+});
+
+/* ---------- stocktake ---------- */
+const jobs = () => D('Jobs').filter(j => j.active !== false);
+const curJob = () => { const js = jobs(); return js.find(j => j.id === state.job) || js[0] || null; };
+const stockById = id => D('Stock').find(x => String(x.id) === String(id));
+const qtyOf = r => (state.pend[r.id] != null ? state.pend[r.id] : Number(r.qty) || 0);
+function stockRowHtml(r, j) {
+  const shop = r.shop != null && r.shop !== '' ? byId(r.shop) : null;
+  return `<div class="srow${state.open === 's' + r.id ? ' open' : ''}" data-sid="${r.id}">
+    <div class="srow-top"><div class="c-main"><div class="c-name">${esc(r.item)}</div><div class="c-meta">${esc([r.detail, r.where].filter(Boolean).join(' · ')) || '&nbsp;'}</div></div>
+      <div class="step"><button type="button" data-qty="${r.id}" data-d="-1" aria-label="One fewer">−</button><b>${qtyOf(r)}</b><button type="button" data-qty="${r.id}" data-d="1" aria-label="One more">+</button></div>
+      <button type="button" class="cond" data-cond="${r.id}" data-c="${esc(r.cond || 'Good')}" title="Click to change condition">${esc(r.cond || 'Good')}</button></div>
+    <div class="c-more"><div><div class="more-in">
+      <div class="sfields">
+        <input data-sf="item" data-sid="${r.id}" value="${esc(r.item)}" aria-label="Name" placeholder="Name">
+        <input data-sf="detail" data-sid="${r.id}" value="${esc(r.detail)}" aria-label="Detail" placeholder="Colour, size, brand…">
+        <input data-sf="where" data-sid="${r.id}" value="${esc(r.where)}" aria-label="Where" placeholder="Where it's kept">
+        <input data-sf="sub" data-sid="${r.id}" value="${esc(r.sub)}" aria-label="Subcategory" list="stkSubs" placeholder="Subcategory">
+        <textarea class="w2 note" data-sf="notes" data-sid="${r.id}" placeholder="Notes…" aria-label="Notes">${esc(r.notes)}</textarea>
+      </div>
+      <div class="more-acts">
+        ${shop && shop.active !== false ? `<span class="linked">${isDone(shop) ? 'Replacement bought ✓' : 'On the shopping list ✓'}</span>` : `<button class="btn btn-sm" type="button" data-shift="${r.id}">Shift to shopping list</button>`}
+        <span class="grow"></span><span class="muted small">${r.checked ? 'Checked ' + fdy(r.checked) : ''}</span>
+        <button class="btn btn-sm btn-ghost btn-danger" type="button" data-delstock="${r.id}">Remove</button>
+      </div>
+    </div></div></div></div>`;
+}
+function renderStock() {
+  const el = $('stock');
+  const miss = STOCK_TABS.filter(n => state.missing.includes(n));
+  if (miss.length && !state.demo) {
+    el.innerHTML = `<div class="gate" style="margin:10px auto"><h2>Stocktake</h2><p class="hint" style="margin-top:8px">Keep track of what you already own, by subcategory, and move gaps straight onto the shopping list.</p>
+      <p class="hint" style="margin-top:8px">This adds two tabs to your sheet: ${miss.map(n => esc(TABS[n].title)).join(' and ')}. Nothing else is touched.</p>
+      <div class="acts"><button class="btn btn-primary" type="button" data-act="setup-stock">Add stocktake tabs</button></div></div>`;
+    return;
+  }
+  const js = jobs(), cur = curJob(); state.job = cur ? cur.id : null;
+  const bar = `<div class="jobbar">${js.map(j => `<button type="button" class="chip" data-job="${j.id}" style="--cc:${catColour(j.cat)}" aria-pressed="${cur && j.id === cur.id}"><i class="cd"></i>${esc(j.name)}</button>`).join('')}<button class="btn btn-sm" type="button" data-act="newjob">+ New stocktake</button></div>`;
+  if (!cur) { el.innerHTML = bar + '<div class="empty">Start a stocktake: give it a name, pick a category from your shopping list, and list subcategories like socks, underwear and jackets. Then add what you own.</div>'; return; }
+  const rows = D('Stock').filter(r => r.active !== false && Number(r.job) === Number(cur.id));
+  const subs = parseSubs(cur.subs);
+  rows.forEach(r => { if (r.sub && !subs.some(x => x.name.toLowerCase() === String(r.sub).toLowerCase())) subs.push({ name: r.sub, target: null }); });
+  if (rows.some(r => !r.sub)) subs.push({ name: '', target: null });
+  const live = rows.map(r => ({ ...r, qty: qtyOf(r) }));
+  const sum = stockSummary(live, subs);
+  const tot = k => sum.reduce((t, x) => t + x[k], 0);
+  const onList = sub => items().filter(i => isOpen(i) && String(i.cat || '').toLowerCase() === String(cur.cat || '').toLowerCase() && String(i.sub || '').toLowerCase() === sub.toLowerCase());
+  const tile = (k, v, s) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  el.innerHTML = bar + `<div class="jobhead"><h2 style="font-size:20px">${esc(cur.name)}</h2>
+      <div class="muted small">${esc(cur.cat || 'No category')} · ${cur.checked ? 'last checked ' + fdy(cur.checked) : 'not checked yet'}${cur.notes ? ' · ' + esc(cur.notes) : ''}</div>
+      <div class="acts"><button class="btn btn-sm" type="button" data-act="checkedjob">Checked today</button><button class="btn btn-sm" type="button" data-act="editjob">Edit stocktake</button></div></div>
+    <div class="stats">${tile('Pieces', tot('pieces'), plural(tot('lines'), 'line'))}${tile('Good to wear', tot('usable'), 'not marked Replace')}${tile('To replace', tot('replace'), plural(live.filter(r => r.cond === 'Replace').length, 'line'))}${tile('Short of target', tot('gap'), plural(sum.filter(x => x.gap).length, 'subcategory', ) .replace('subcategorys', 'subcategories'))}</div>
+    <datalist id="stkSubs">${subs.filter(x => x.name).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist>
+    <div class="sgrid">${sum.map(x => {
+      const its = live.filter(r => String(r.sub || '').toLowerCase() === x.name.toLowerCase());
+      const pct = x.target ? Math.min(100, x.usable / x.target * 100) : 0, ol = x.name ? onList(x.name) : [];
+      const buy = Math.max(0, x.gap - ol.reduce((t, i) => t + (Number(i.qty) || 1), 0));
+      return `<section class="sbox" data-sub="${esc(x.name)}"><div class="sbox-h"><h2>${esc(x.name || 'No subcategory')}</h2><span class="cnt"><b>${x.usable}</b>${x.target != null ? ' of ' + x.target : ''}${x.replace ? ` · ${x.replace} to replace` : ''}</span></div>
+        ${x.target ? `<div class="meter${x.usable >= x.target ? ' full' : ''}"><i style="width:${pct}%"></i></div>` : ''}
+        <div class="srows">${its.map(r => stockRowHtml(r, cur)).join('')}</div>
+        <form class="sadd" data-addstock="${esc(x.name)}" autocomplete="off"><input name="n" placeholder="Add ${esc((x.name || 'an item').toLowerCase())}…" aria-label="New item"><input name="q" inputmode="numeric" value="1" aria-label="Qty"><button class="btn btn-sm" type="submit">Add</button></form>
+        <div class="sfoot">${buy ? `<button class="btn btn-sm btn-primary" type="button" data-gapbuy="${esc(x.name)}" data-n="${buy}" data-target="${x.target}">Add ${buy} to shopping list</button>` : ''}${ol.length ? `<button class="btn btn-sm btn-ghost" type="button" data-onlist="${esc(x.name)}">${ol.length} on the shopping list →</button>` : ''}</div></section>`;
+    }).join('')}<form class="sbox newsub" id="addSub" autocomplete="off"><h2>Add a subcategory</h2><div class="sadd"><input name="n" placeholder="e.g. Hats" aria-label="Subcategory"><input name="q" inputmode="numeric" placeholder="target" aria-label="Target"><button class="btn btn-sm" type="submit">Add</button></div></form></div>`;
+}
+async function saveJob(j, patch, msg) { if (await withBusy('Saving…', () => updateRow('Jobs', { ...j, ...patch })) && msg) toast(msg); }
+async function saveStock(r, patch, msg, undo) {
+  const ok = await withBusy('Saving…', () => updateRow('Stock', { ...r, ...patch, checked: todayIso() }));
+  if (ok && msg) toast(msg, undo ? { label: 'Undo', fn: () => { const c = stockById(r.id); if (c) withBusy('Undoing…', () => updateRow('Stock', { ...c, ...Object.fromEntries(Object.keys(patch).map(k => [k, r[k]])) })); } } : null);
+}
+let qtyTimers = {};
+function bumpQty(id, d) {
+  const r = stockById(id); if (!r) return;
+  state.pend[id] = Math.max(0, qtyOf(r) + d); renderStock();
+  clearTimeout(qtyTimers[id]);
+  qtyTimers[id] = setTimeout(async () => { const cur = stockById(id), v = state.pend[id]; if (!cur || v == null) return;
+    if (await withBusy('Saving…', () => updateRow('Stock', { ...cur, qty: v, checked: todayIso() }))) delete state.pend[id]; else { delete state.pend[id]; renderStock(); } }, 700);
+}
+/* New shopping card from the stocktake: same category, subcategory as the subcategory. */
+async function toShopping(job, sub, o) {
+  const it = { ...blankItem(), cat: job.cat || cats()[0], sub, kind: 'Need', prio: 2, added: todayIso(), order: D('Items').reduce((m, i) => Math.max(m, effOrder(i)), 0) + 1000, ...o };
+  it.notes = joinNotes(it.notes, 'From stocktake: ' + job.name);
+  await addRows('Items', [it]); return it;
+}
+function openJob(j) {
+  const cs = cats(); $('jTitle').textContent = j ? 'Edit stocktake' : 'New stocktake'; $('jMsg').textContent = '';
+  $('jCat').innerHTML = cs.concat(j && j.cat && !cs.includes(j.cat) ? [j.cat] : []).map(c => `<option>${esc(c)}</option>`).join('');
+  $('jCat').value = j ? j.cat : (cs.includes('Clothing') ? 'Clothing' : cs[0]);
+  $('jName').value = j ? j.name : ''; $('jNotes').value = j ? j.notes : '';
+  $('jSubs').value = j ? subsText(parseSubs(j.subs)) : (SUB_PRESETS[$('jCat').value.toLowerCase()] || '');
+  $('jRemove').hidden = !j; $('jobDlg').dataset.id = j ? j.id : '';
+  $('jobDlg').showModal();
+}
+const isPreset = v => !v.trim() || Object.values(SUB_PRESETS).some(p => subsText(parseSubs(p)) === subsText(parseSubs(v)));
+$('jPreset').addEventListener('click', () => { const p = SUB_PRESETS[$('jCat').value.toLowerCase()]; if (!p) { $('jMsg').textContent = 'No starter list for this category. Type your own.'; return; }
+  $('jSubs').value = isPreset($('jSubs').value) ? p : subsText(parseSubs($('jSubs').value + ', ' + p)); });
+$('jCat').addEventListener('change', () => { if (isPreset($('jSubs').value)) $('jSubs').value = SUB_PRESETS[$('jCat').value.toLowerCase()] || ''; });
+$('jobForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('jName').value.trim(); if (!name) { $('jMsg').textContent = 'Give it a name.'; return; }
+  const j = D('Jobs').find(x => String(x.id) === $('jobDlg').dataset.id);
+  const o = { ...(j || { status: 'Open', started: todayIso(), checked: '', active: true }), name, cat: $('jCat').value, subs: subsText(parseSubs($('jSubs').value)), notes: $('jNotes').value.trim() };
+  $('jobDlg').close();
+  if (j) await withBusy('Saving…', () => updateRow('Jobs', o));
+  else if (await withBusy('Adding…', () => addRows('Jobs', [o]))) { state.job = o.id; renderStock(); }
+});
+$('jRemove').addEventListener('click', async () => {
+  const j = D('Jobs').find(x => String(x.id) === $('jobDlg').dataset.id); if (!j) return;
+  if (!await ask('Remove this stocktake?', `<p class="hint">${esc(j.name)} and its list come off the app. The rows stay in the sheet with Active set to FALSE.</p>`, 'Remove')) return;
+  $('jobDlg').close(); state.job = null; await saveJob(j, { active: false }, 'Removed ' + j.name);
+});
+document.addEventListener('submit', async e => {
+  const f = e.target, j = curJob();
+  if (f.dataset && f.dataset.addstock !== undefined) {
+    e.preventDefault(); const n = f.n.value.trim(); if (!n || !j) return;
+    const o = { job: j.id, sub: f.dataset.addstock, item: n, qty: Math.max(0, Number(f.q.value) || 1), cond: 'Good', detail: '', where: '', notes: '', checked: todayIso(), shop: null, active: true };
+    const sub = f.dataset.addstock;
+    if (await withBusy('Adding…', () => addRows('Stock', [o]))) { const inp = document.querySelector(`[data-addstock="${CSS.escape(sub)}"] input[name=n]`); if (inp) inp.focus(); }
+  } else if (f.id === 'addSub') {
+    e.preventDefault(); const n = f.n.value.trim(); if (!n || !j) return;
+    const subs = parseSubs(j.subs); if (subs.some(x => x.name.toLowerCase() === n.toLowerCase())) { toast(n + ' is already there'); return; }
+    subs.push({ name: n, target: f.q.value.trim() ? Number(f.q.value) || null : null });
+    await saveJob(j, { subs: subsText(subs) }, 'Added ' + n);
+  }
+});
+document.addEventListener('click', async e => {
+  const t = e.target, j = curJob();
+  const jb = t.closest('[data-job]'); if (jb) { state.job = Number(jb.dataset.job); renderStock(); return; }
+  const q = t.closest('[data-qty]'); if (q) { bumpQty(q.dataset.qty, Number(q.dataset.d)); return; }
+  const c = t.closest('[data-cond]'); if (c) { const r = stockById(c.dataset.cond); if (r) saveStock(r, { cond: nextCond(r.cond) }); return; }
+  const del = t.closest('[data-delstock]'); if (del) { const r = stockById(del.dataset.delstock); if (r) saveStock(r, { active: false }, 'Removed ' + r.item, true); return; }
+  const sh = t.closest('[data-shift]'); if (sh && j) { const r = stockById(sh.dataset.shift); if (!r) return;
+    let made; if (await withBusy('Adding to shopping list…', async () => { made = await toShopping(j, r.sub, { item: r.item, notes: joinNotes(r.detail, r.cond === 'Replace' ? 'Replacing a worn-out one' : '') }); await updateRow('Stock', { ...r, shop: made.id }); })) toast(`${r.item} is on the shopping list`, { label: 'Open', fn: () => { const it = byId(made.id); if (it) openItem(it); } });
+    return; }
+  const gb = t.closest('[data-gapbuy]'); if (gb && j) { const sub = gb.dataset.gapbuy, n = Number(gb.dataset.n); if (!n) return;
+    let made; if (await withBusy('Adding to shopping list…', async () => { made = await toShopping(j, sub, { item: sub, qty: n, notes: `${n} more to reach the target of ${gb.dataset.target}` }); })) toast(`Added ${n} × ${sub} to the shopping list`, { label: 'Open', fn: () => { const it = byId(made.id); if (it) openItem(it); } });
+    return; }
+  const ol = t.closest('[data-onlist]'); if (ol && j) { state.catF = new Set([j.cat]); state.kindF = ''; state.q = ol.dataset.onlist; $('q').value = state.q; showView('list'); return; }
+  const row = t.closest('.srow'); if (row && !t.closest('input,textarea,select,button,a,label')) { const k = 's' + row.dataset.sid; state.open = state.open === k ? null : k; document.querySelectorAll('.srow.open').forEach(x => { if (x !== row) x.classList.remove('open'); }); row.classList.toggle('open', state.open === k); }
+});
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t.dataset || !t.dataset.sf) return;
+  const r = stockById(t.dataset.sid); if (!r) return; const v = t.value.trim();
+  if (t.dataset.sf === 'item' && !v) { t.value = r.item; return; }
+  if (v !== String(r[t.dataset.sf] || '')) await saveStock(r, { [t.dataset.sf]: v }, 'Saved');
 });
 
 /* ---------- list order dialog ---------- */
@@ -1490,6 +1726,11 @@ function demoData() {
     I(20, { item: 'Boxer briefs (pack)', cat: 'Clothing', kind: 'Need', status: 'Bought', cost: 26.4, qty: 15, final: 316.8, bought: back(35) }),
     I(21, { item: 'Tablet floor stand', cat: 'Entertainment', kind: 'Want', status: 'Bought', cost: 80, final: 80, bought: back(12) })
   ];
+  data.Jobs = [{ _row: 2, id: 1, name: 'Wardrobe', cat: 'Clothing', subs: 'T-shirts (8), Shirts (5), Pants (4), Jackets (3), Socks (10), Underwear (14)', status: 'Open', started: back(3), checked: back(3), notes: '', active: true }];
+  const S = (id, sub, item, qty, cond, detail, where) => ({ _row: id + 1, id, job: 1, sub, item, qty, cond, detail: detail || '', where: where || '', notes: '', checked: back(3), shop: null, active: true });
+  data.Stock = [S(1, 'T-shirts', 'Plain tee', 4, 'Good', 'Black, navy', 'Drawer 1'), S(2, 'T-shirts', 'Band tee', 2, 'Worn', 'Grey'), S(3, 'Shirts', 'Oxford shirt', 2, 'Good', 'Light blue, white', 'Wardrobe'),
+    S(4, 'Shirts', 'Linen shirt', 1, 'Replace', 'Stone'), S(5, 'Pants', 'Chinos', 2, 'Good', 'Navy, khaki'), S(6, 'Pants', 'Work pants', 1, 'Good'), S(7, 'Jackets', 'Rain shell', 1, 'Good', 'Black', 'Hall cupboard'),
+    S(8, 'Socks', 'Merino socks', 3, 'Good'), S(9, 'Socks', 'Sports socks', 4, 'Worn'), S(10, 'Underwear', 'Boxer briefs', 10, 'Good', '', 'Drawer 2'), S(11, 'Underwear', 'Old briefs', 4, 'Replace')];
   data.Settings = DEFAULT_SETTINGS.map(([key, value, notes], i) => ({ _row: i + 2, key, value: String(value), notes })).concat([{ _row: 7, key: 'budget:Office', value: '2500', notes: '' }, { _row: 8, key: 'budget:Clothing', value: '1500', notes: '' }]);
   return data;
 }
