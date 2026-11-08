@@ -4,7 +4,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'app.html'), 'utf8');
 const a = html.indexOf('const esc = '), s = html.indexOf('/* LOGIC START'), e = html.indexOf('/* LOGIC END */');
 if (a < 0 || s < 0 || e < 0) { console.log('FAIL logic markers not found in app.html'); process.exit(1); }
 const helpers = html.slice(a, s).split('\n').filter(l => !/^const (\$|todayIso|fdy|plural) /.test(l)).join('\n');
-const L = new Function(helpers + html.slice(s, e) + '\n;return { money, fmtMoney, total, saving, coolingLeft, rank, sortItems, effOrder, orderBetween, fromLink, buyListRows, BUYLIST_HEADS, toCsv, toTsv, guessCategory, normWindow, shortDate, mapPriorities, mapPurchases, mapClothing, mapHousehold, sameThing, mergeInto, planImport, blankItem, fmtMoney, isOpen };')();
+const L = new Function(helpers + html.slice(s, e) + '\n;return { money, fmtMoney, total, saving, coolingLeft, rank, sortItems, effOrder, orderBetween, fromLink, buyListRows, BUYLIST_HEADS, toCsv, toTsv, guessCategory, normWindow, shortDate, mapPriorities, mapPurchases, mapClothing, mapHousehold, sameThing, mergeInto, planImport, blankItem, fmtMoney, isOpen, parseSubs, subsText, stockSummary, nextCond, SUB_PRESETS, CONDITIONS };')();
 
 let pass = 0, fail = 0;
 function eq(name, got, want) {
@@ -200,6 +200,33 @@ eq('import: inactive existing does not block', plan.items.some(i => i.item === '
 eq('import: second run with first run output skips everything', (() => { const p1 = L.planImport(src, [], TODAY); const p2 = L.planImport(src, p1.items, TODAY); return [p2.items.length, p2.skipped.length === p1.items.length]; })(), [0, true]);
 eq('import: missing tabs ok', L.planImport({}, [], TODAY).items.length, 0);
 eq('import: Purchases-only tab, row 0 is header', L.planImport({ Purchases: [R(['Product']), R(['Thing One', 'Office'])] }, [], TODAY).items.map(i => i.item), ['Thing One']);
+
+/* stocktake */
+eq('parseSubs: targets and plain names', L.parseSubs('Socks (10), Jackets'), [{ name: 'Socks', target: 10 }, { name: 'Jackets', target: null }]);
+eq('parseSubs: dedupes case-insensitively, first wins', L.parseSubs('Socks (10), socks (4), SOCKS'), [{ name: 'Socks', target: 10 }]);
+eq('parseSubs: blank/null/stray commas', [L.parseSubs(''), L.parseSubs(null), L.parseSubs(' , ,')], [[], [], []]);
+eq('parseSubs: spacing and zero target', L.parseSubs('  T-shirts(6) ,Hats ( 3 ), Belts (0)'), [{ name: 'T-shirts', target: 6 }, { name: 'Hats ( 3 )', target: null }, { name: 'Belts', target: 0 }]);
+eq('parseSubs: non-numeric parens stay in the name', L.parseSubs('Shoes (work)'), [{ name: 'Shoes (work)', target: null }]);
+eq('subsText: joins with targets', L.subsText([{ name: 'Socks', target: 10 }, { name: 'Jackets', target: null }]), 'Socks (10), Jackets');
+eq('subsText: empty list', L.subsText([]), '');
+eq('subsText: zero target kept', L.subsText([{ name: 'Belts', target: 0 }]), 'Belts (0)');
+eq('subsText/parseSubs round trip', L.subsText(L.parseSubs('Socks (10), Jackets, Hats (3)')), 'Socks (10), Jackets, Hats (3)');
+eq('round trip is stable for every preset', Object.values(L.SUB_PRESETS).every(p => L.subsText(L.parseSubs(L.subsText(L.parseSubs(p)))) === L.subsText(L.parseSubs(p))), true);
+const stk = [
+  { sub: 'Socks', qty: 6, cond: 'Good' }, { sub: 'socks', qty: 3, cond: 'Replace' }, { sub: 'Socks', qty: 2, cond: 'Worn' },
+  { sub: 'Jackets', qty: 2, cond: 'Good' }, { sub: 'Hats', qty: '4', cond: 'Replace' }, { sub: 'Other', qty: 5, cond: 'Good' }
+];
+const sm = L.stockSummary(stk, L.parseSubs('Socks (10), Jackets, Hats (2), Belts (3)'));
+eq('stockSummary: Replace rows reduce usable, Worn still counts', sm[0], { name: 'Socks', target: 10, lines: 3, pieces: 11, replace: 3, usable: 8, gap: 2 });
+eq('stockSummary: no target -> gap 0', sm[1], { name: 'Jackets', target: null, lines: 1, pieces: 2, replace: 0, usable: 2, gap: 0 });
+eq('stockSummary: all Replace, string qty coerced', sm[2], { name: 'Hats', target: 2, lines: 1, pieces: 4, replace: 4, usable: 0, gap: 2 });
+eq('stockSummary: empty sub with target', sm[3], { name: 'Belts', target: 3, lines: 0, pieces: 0, replace: 0, usable: 0, gap: 3 });
+eq('stockSummary: gap never negative', L.stockSummary([{ sub: 'A', qty: 9, cond: 'Good' }], [{ name: 'A', target: 4 }])[0].gap, 0);
+eq('stockSummary: rows outside subs ignored, no rows ok', [sm.length, L.stockSummary([], [{ name: 'A', target: 2 }])[0].gap], [4, 2]);
+eq('stockSummary: row with blank qty counts 0 pieces but one line', L.stockSummary([{ sub: 'A', qty: '', cond: 'Good' }], [{ name: 'A', target: null }])[0], { name: 'A', target: null, lines: 1, pieces: 0, replace: 0, usable: 0, gap: 0 });
+eq('CONDITIONS order', L.CONDITIONS, ['Good', 'Worn', 'Replace']);
+eq('nextCond cycles Good>Worn>Replace>Good', [L.nextCond('Good'), L.nextCond('Worn'), L.nextCond('Replace')], ['Worn', 'Replace', 'Good']);
+eq('nextCond: unknown/blank -> Good', [L.nextCond(''), L.nextCond(undefined)], ['Good', 'Good']);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
