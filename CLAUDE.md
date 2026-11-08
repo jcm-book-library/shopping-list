@@ -12,6 +12,6 @@
 
 ## Google Sheet
 - Sheet id is in the owner's browser settings (`wn_config`), not here: the repo is public.
-- The app owns only `🛒 Items` and `🛒 Settings`. Columns are in the README. It never deletes rows: remove = Active FALSE.
+- The app owns only `🛒 Items`, `🛒 Settings`, `🛒 Stocktakes` and `🛒 Stock` (the last two optional, added from the Stocktake tab). Columns are in the README. It never deletes rows: remove = Active FALSE.
 - The importer **reads** the owner's hand-made tabs `Priorities`, `Purchases`, `Clothing` and `Household` (scoped ranges, read-only) and writes the result to `🛒 Items` only, after a preview the owner ticks through. Never write to those four tabs or any other tab in that sheet (it also holds Budget, Accounts and other finance tabs).
 - Photos: optional, uploaded to the owner's Google Drive (`drive.file` scope: the app sees only files it made) in a folder "Want & Need photos". The Image column holds `drive:<fileId>` or a normal image URL.

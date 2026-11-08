@@ -12,6 +12,7 @@ Try it without a sheet: https://jcm-book-library.github.io/shopping-list/?demo
 - **Gallery:** every item as a picture. Pictures come from an image address you paste, a photo you upload (saved to your Google Drive), or an image dragged onto a card from another browser tab. With no picture, the shop's icon shows.
 - **Budget:** totals by category (with an optional budget per category), by time frame with a running total, need vs want, Pay in 4 instalments, biggest items, and **Send to the budget app** (copy rows or download a CSV in the same columns as Coin & Compass's BuyList tab).
 - **Bought:** everything you've ticked, by month, with what you paid. Untick to put something back on the list.
+- **Stocktake:** what you already own. Start a stocktake (e.g. "Wardrobe"), pick a shopping-list category (Clothing) and list subcategories with optional targets, e.g. `Socks (10)`. Each subcategory is a box: add items, − / + the count, click the condition (Good → Worn → Replace), hover for detail, where it's kept and notes. **Shift to shopping list** turns an item into a shopping card; **Add N to shopping list** fills a subcategory up to its target, counting what's already on the list.
 - **Cooling-off:** wants over $100 show "Wait N days" for 30 days after they're added (both numbers in Settings).
 - **Quick add:** type a name, or paste a product link (the shop and a name are filled in for you).
 
@@ -26,6 +27,10 @@ Try it without a sheet: https://jcm-book-library.github.io/shopping-list/?demo
 |---|---|
 | 🛒 Items | id, Item, Category, Subcategory, Room, Need or want, Priority, Status, Time frame, Price each, Qty, Sale price each, Paid total, Retailer, Link, Image, Stickers, Pay in 4, Notes, Date added, Date bought, Order, Source, Active |
 | 🛒 Settings | Key, Value, Notes (`categories`, `windows`, `stickers`, `cooling_off_days`, `cooling_off_threshold`, `budget:<Category>`) |
+| 🛒 Stocktakes | id, Stocktake, Category, Subcategories, Status, Started, Last checked, Notes, Active |
+| 🛒 Stock | id, Stocktake id, Subcategory, Item, Qty, Condition, Detail, Where, Notes, Last checked, Shopping id, Active |
+
+Subcategories is a comma list; a target goes in brackets: `Socks (10), Jackets (3), Hats`. The two stocktake tabs are optional: the Stocktake tab adds them the first time you open it.
 
 Status is one of Idea, Planned, Waiting for sale, Bought, Dropped (the same as Coin & Compass). Keep the column order; rows can be edited or sorted by hand, the page finds rows by id.
 
